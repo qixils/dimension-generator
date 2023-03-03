@@ -1,0 +1,12 @@
+loom {
+    mods {
+        modid {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+
+dependencies {
+    include(implementation(projects.lib))
+}

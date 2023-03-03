@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"id": "infinite-dimensions",
+	"version": "${version}",
+	"name": "Infinite Dimensions",
+	"description": "Dynamically generates infinite new dimensions in the vein of 20w14infinite",
+	"authors": [
+		"qixils"
+	],
+	"contact": {
+		"homepage": "https://github.com/qixils/dimension-generator",
+		"sources": "https://github.com/qixils/dimension-generator"
+	},
+	"license": "MIT",
+	"icon": "assets/infinite-dimensions/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"dev.qixils.dimensiongenerator.mod.InfiniteDimensions"
+		],
+		"client": [
+			"dev.qixils.dimensiongenerator.mod.client.InfiniteDimensionsClient"
+		]
+	},
+	"mixins": [
+		"infinite-dimensions.mixins.json",
+		{
+			"config": "infinite-dimensions.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.14.14",
+		"minecraft": "~1.19.3",
+		"java": ">=17",
+		"fabric-api": "*",
+		"dimension-generator": ">=${lib_version}"
+	}
+}

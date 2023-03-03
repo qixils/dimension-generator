@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"id": "dimension-generator",
+	"version": "${version}",
+	"name": "Dimension Generator",
+	"description": "Dynamically generate new dimensions, biomes, etc.",
+	"authors": [
+		"qixils"
+	],
+	"contact": {
+		"homepage": "https://github.com/qixils/dimension-generator",
+		"sources": "https://github.com/qixils/dimension-generator"
+	},
+	"license": "MIT",
+	"icon": "assets/dimension-generator/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"dev.qixils.dimensiongenerator.DimensionGenerator"
+		],
+		"client": [
+			"dev.qixils.dimensiongenerator.client.DimensionGeneratorClient"
+		]
+	},
+	"mixins": [
+		"dimension-generator.mixins.json",
+		{
+			"config": "dimension-generator.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"accessWidener": "dimension-generator.accesswidener",
+	"depends": {
+		"fabricloader": ">=0.14.14",
+		"minecraft": "~1.19.3",
+		"java": ">=17",
+		"fabric-api": "*"
+	}
+}
