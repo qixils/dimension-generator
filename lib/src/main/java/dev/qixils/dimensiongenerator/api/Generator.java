@@ -100,28 +100,6 @@ public interface Generator {
     }
 
     /**
-     * Generates random {@link DimensionType.MonsterSettings monster settings}
-     * for a {@link DimensionType dimension type}.
-     *
-     * @param seed the seed to use, or empty to use {@link #DEFAULT_RANDOM}
-     * @return random monster settings
-     * @since 1.0.0
-     */
-    DimensionType.@NotNull MonsterSettings generateMonsterSettings(@NotNull OptionalLong seed);
-
-    /**
-     * Generates random {@link DimensionType.MonsterSettings monster settings}
-     * for a {@link DimensionType dimension type}.
-     *
-     * @return random monster settings
-     * @since 1.0.0
-     */
-    @ApiStatus.NonExtendable
-    default DimensionType.@NotNull MonsterSettings generateMonsterSettings() {
-        return generateMonsterSettings(OptionalLong.empty());
-    }
-
-    /**
      * Generates a random {@link IntProvider int provider} from the given inclusive range.
      *
      * @param seed the seed to use, or empty to use {@link #DEFAULT_RANDOM}

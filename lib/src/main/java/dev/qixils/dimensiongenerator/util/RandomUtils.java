@@ -5,11 +5,7 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.collection.IndexedIterable;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static dev.qixils.dimensiongenerator.util.RegistryUtils.getRegisteredValue;
@@ -66,5 +62,24 @@ public class RandomUtils {
 
     public static <T extends Enum<T>> T randomFromEnum(Random random, Class<T> enumClass) {
         return randomFromArray(random, enumClass.getEnumConstants());
+    }
+
+    public static <T> List<T> randomSubset(Random random, Collection<T> items, int size) {
+        List<T> copy = new ArrayList<>(items);
+        Collections.shuffle(copy, random);
+        return copy.subList(0, Math.min(size, copy.size()));
+    }
+
+    public static <T> List<T> randomSubset(Random random, Collection<T> items) {
+        return randomSubset(random, items, random.nextInt(items.size()));
+    }
+
+    public static <T> List<T> randomItems(Random random, Collection<T> items, double probability) {
+        List<T> result = new ArrayList<>();
+        for (T item : items) {
+            if (random.nextDouble() <= probability)
+                result.add(item);
+        }
+        return result;
     }
 }

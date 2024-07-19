@@ -20,6 +20,9 @@
 		],
 		"client": [
 			"dev.qixils.dimensiongenerator.client.DimensionGeneratorClient"
+		],
+		"fabric-datagen": [
+			"dev.qixils.dimensiongenerator.DataGeneration"
 		]
 	},
 	"mixins": [

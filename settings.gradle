@@ -9,7 +9,7 @@ pluginManagement {
     }
 }
 
-rootProject.name = "root"
+rootProject.name = "dimension-generator-parent"
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 

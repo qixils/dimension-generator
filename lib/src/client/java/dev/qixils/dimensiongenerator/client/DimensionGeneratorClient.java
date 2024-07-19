@@ -100,11 +100,6 @@ public class DimensionGeneratorClient implements ClientModInitializer, ClientGen
     }
 
     @Override
-    public DimensionType.@NotNull MonsterSettings generateMonsterSettings(@NotNull OptionalLong seed) {
-        return DimensionGenerator.INSTANCE.generateMonsterSettings(seed);
-    }
-
-    @Override
     public @NotNull IntProvider generateIntProvider(@NotNull OptionalLong seed, int min, int max) {
         return DimensionGenerator.INSTANCE.generateIntProvider(seed, min, max);
     }

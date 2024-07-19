@@ -7,22 +7,27 @@ import dev.qixils.dimensiongenerator.mixin.RegistryEntryReferenceAccessor;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.block.Block;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.SpawnGroup;
+import net.minecraft.particle.ParticleEffect;
+import net.minecraft.registry.*;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.WorldGenerationProgressListener;
 import net.minecraft.server.WorldGenerationProgressLogger;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.BiomeAdditionsSound;
+import net.minecraft.sound.BiomeMoodSound;
+import net.minecraft.sound.MusicSound;
+import net.minecraft.sound.SoundEvent;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.intprovider.BiasedToBottomIntProvider;
 import net.minecraft.util.math.intprovider.ConstantIntProvider;
 import net.minecraft.util.math.intprovider.IntProvider;
 import net.minecraft.util.math.intprovider.UniformIntProvider;
 import net.minecraft.world.World;
-import net.minecraft.world.biome.Biome;
+import net.minecraft.world.biome.*;
 import net.minecraft.world.biome.source.BiomeAccess;
 import net.minecraft.world.biome.source.BiomeSource;
 import net.minecraft.world.border.WorldBorderListener;
@@ -30,17 +35,16 @@ import net.minecraft.world.dimension.DimensionOptions;
 import net.minecraft.world.dimension.DimensionType;
 import net.minecraft.world.dimension.DimensionTypes;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
+import net.minecraft.world.gen.feature.PlacedFeature;
 import net.minecraft.world.level.ServerWorldProperties;
 import net.minecraft.world.level.UnmodifiableLevelProperties;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.OptionalLong;
-import java.util.Random;
+import java.util.*;
 
-import static dev.qixils.dimensiongenerator.util.RandomUtils.randomFromArray;
-import static dev.qixils.dimensiongenerator.util.RandomUtils.randomTagFor;
+import static dev.qixils.dimensiongenerator.util.RandomUtils.*;
 import static dev.qixils.dimensiongenerator.util.RegistryUtils.getRegisteredValue;
 
 public class DimensionGenerator implements ModInitializer, Generator {
@@ -116,7 +120,13 @@ public class DimensionGenerator implements ModInitializer, Generator {
 				? randomFromArray(rng, DimensionTypes.OVERWORLD_ID, DimensionTypes.THE_NETHER_ID, DimensionTypes.THE_END_ID)
 				: Identifier.of(NAMESPACE, String.valueOf(rng.nextLong())); // will fall back to overworld if client doesn't have the mod
 		float ambientLight = rng.nextFloat();
-		DimensionType.MonsterSettings monsterSettings = generateMonsterSettings(seed);
+
+		// monster settings
+		boolean piglinSafe = rng.nextBoolean();
+		boolean hasRaids = rng.nextBoolean();
+		IntProvider monsterSpawnLightTest = generateIntProvider(seed, 0, 16);
+		int monsterSpawnBlockLightLimit = rng.nextInt(16); // defaults to min of 0
+		DimensionType.MonsterSettings monsterSettings = new DimensionType.MonsterSettings(piglinSafe, hasRaids, monsterSpawnLightTest, monsterSpawnBlockLightLimit);
 
 		// technically the code does not validate that the min Y must be >=MIN_HEIGHT, just the JSON deserializer does
 		// however this is probably a bug so I'm going to pretend it does
@@ -126,16 +136,6 @@ public class DimensionGenerator implements ModInitializer, Generator {
 				? DimensionType.MIN_HEIGHT
 				: rng.nextInt(DimensionType.MIN_HEIGHT / 16, ((DimensionType.MAX_COLUMN_HEIGHT + 1 - height) / 16) + 1) * 16;
 		return new DimensionType(fixedTime, hasSkyLight, hasCeiling, ultrawarm, natural, coordinateScale, bedWorks, respawnAnchorWorks, minY, height, logicalHeight, infiniburn, effects, ambientLight, monsterSettings);
-	}
-
-	@Override
-	public DimensionType.@NotNull MonsterSettings generateMonsterSettings(@NotNull OptionalLong seed) {
-		Random rng = createRandom(seed);
-		boolean piglinSafe = rng.nextBoolean();
-		boolean hasRaids = rng.nextBoolean();
-		IntProvider monsterSpawnLightTest = generateIntProvider(seed, 0, 16);
-		int monsterSpawnBlockLightLimit = rng.nextInt(16); // defaults to min of 0
-		return new DimensionType.MonsterSettings(piglinSafe, hasRaids, monsterSpawnLightTest, monsterSpawnBlockLightLimit);
 	}
 
 	@Override
@@ -167,6 +167,93 @@ public class DimensionGenerator implements ModInitializer, Generator {
 
 	@Override
 	public @NotNull Biome generateBiome(@NotNull OptionalLong seed) {
-		return null; // TODO
+		Random rng = createRandom(seed);
+		//// weather ////
+		Biome.Builder biome = new Biome.Builder();
+		biome.precipitation(randomFromEnum(rng, Biome.Precipitation.class));
+		// anything above 1 is considered hot; adding 0.2 to even the odds for cold/hot sounds about right
+		biome.temperature(rng.nextFloat(1.2f));
+		if (rng.nextInt(10) == 0) biome.temperatureModifier(randomFromEnum(rng, Biome.TemperatureModifier.class));
+		biome.downfall(rng.nextInt(101) / 100f);
+
+		//// biome effects ////
+		BiomeEffects.Builder effects = new BiomeEffects.Builder();
+		effects.fogColor(rng.nextInt(0x1000000));
+		effects.waterColor(rng.nextInt(0x1000000));
+		effects.waterFogColor(rng.nextInt(0x1000000));
+		effects.skyColor(rng.nextInt(0x1000000));
+		if (rng.nextBoolean()) effects.foliageColor(rng.nextInt(0x1000000));
+		if (rng.nextBoolean()) effects.grassColor(rng.nextInt(0x1000000));
+		if (rng.nextInt(10) == 0) effects.grassColorModifier(randomFromEnum(rng, BiomeEffects.GrassColorModifier.class));
+		if (rng.nextInt(10) == 0) {
+			// biome particle config
+			List<ParticleEffect> particles = Registries.PARTICLE_TYPE.stream()
+					.filter(type -> type instanceof ParticleEffect)
+					.map(type -> (ParticleEffect) type)
+					.toList();
+			ParticleEffect particle = randomFromList(rng, particles);
+			float probability = rng.nextFloat();
+			effects.particleConfig(new BiomeParticleConfig(particle, probability));
+		}
+		if (rng.nextInt(10) == 0) effects.loopSound(randomFromIndexedIterable(rng, Registries.SOUND_EVENT.getIndexedEntries()));
+		if (rng.nextInt(10) == 0) {
+			// biome mood sound
+			RegistryEntry<SoundEvent> sound = randomFromIndexedIterable(rng, Registries.SOUND_EVENT.getIndexedEntries());
+			int cultivationTicks = (int) (300 / (rng.nextDouble() + Double.MIN_VALUE));
+			int spawnRange = (int) (1 / (rng.nextDouble() + Double.MIN_VALUE));
+			double extraDistance = 1 / (rng.nextDouble() + Double.MIN_VALUE);
+			effects.moodSound(new BiomeMoodSound(sound, cultivationTicks, spawnRange, extraDistance));
+		}
+		if (rng.nextInt(10) == 0) {
+			// biome additions sound
+			RegistryEntry<SoundEvent> sound = randomFromIndexedIterable(rng, Registries.SOUND_EVENT.getIndexedEntries());
+			double chance = 0.005d / (rng.nextDouble() + Double.MIN_VALUE); // vanilla uses 0.0111d
+			effects.additionsSound(new BiomeAdditionsSound(sound, chance));
+		}
+		if (rng.nextInt(10) == 0) {
+			// music sound
+			RegistryEntry<SoundEvent> sound = randomFromIndexedIterable(rng, Registries.SOUND_EVENT.getIndexedEntries());
+			int minDelay = (int) (20 / (rng.nextDouble() + Double.MIN_VALUE));
+			int maxDelay = (int) (minDelay * (2 / (rng.nextDouble() + Double.MIN_VALUE)));
+			boolean replaceCurrentMusic = rng.nextBoolean();
+			effects.music(new MusicSound(sound, minDelay, maxDelay, replaceCurrentMusic));
+		}
+		biome.effects(effects.build());
+
+		//// spawn settings ////
+		SpawnSettings.Builder spawns = new SpawnSettings.Builder();
+		List<EntityType<?>> spawnableMobs = Registries.ENTITY_TYPE.stream()
+				.filter(type -> type.getSpawnGroup() != SpawnGroup.MISC) // TODO: whitelist some misc mobs like armor stands
+				.toList();
+		Map<Identifier, EntityType<?>> allMobsToSpawn = new HashMap<>();
+		for (SpawnGroup group : SpawnGroup.values()) {
+			if (group == SpawnGroup.MISC) continue;
+			List<EntityType<?>> toSpawn = randomSubset(rng, spawnableMobs, (int) (0.05d / (rng.nextDouble() + Double.MIN_VALUE)));
+			for (EntityType<?> entity : toSpawn) {
+				int weight = (int) (1 / (rng.nextDouble() + Double.MIN_VALUE));
+				int minGroupSize = (int) (1 / (rng.nextDouble() + Double.MIN_VALUE));
+				int maxGroupSize = (int) (minGroupSize * (1.5d / (rng.nextDouble() + Double.MIN_VALUE)));
+				spawns.spawn(group, new SpawnSettings.SpawnEntry(entity, weight, minGroupSize, maxGroupSize));
+				allMobsToSpawn.put(EntityType.getId(entity), entity);
+			}
+		}
+		for (EntityType<?> entity : allMobsToSpawn.values()) {
+			// spawn cost
+			if (rng.nextInt(10) != 0) continue;
+			double mass = rng.nextDouble();
+			double gravityLimit = rng.nextDouble();
+			spawns.spawnCost(entity, mass, gravityLimit);
+		}
+		spawns.creatureSpawnProbability((0.1f / (rng.nextFloat() + Float.MIN_VALUE)) - 0.09f); // vanilla uses 0.1f
+		biome.spawnSettings(spawns.build());
+
+		//// generation settings ////
+		GenerationSettings.Builder generation = new GenerationSettings.Builder();
+		RegistryEntryLookup<PlacedFeature> featureLookup = RegistryKeys.PLACED_FEATURE;
+		biome.generationSettings(generation.build());
+
+
+
+		return biome.build();
 	}
 }
